@@ -26,6 +26,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
   bool _processStarted = false;
   bool _configDeploySent = false;
   int _configDeployAttempt = 0; // Add this to track config deploy attempts
+  String _currentStep = ''; // Current step message
 
   @override
   void initState() {
@@ -34,9 +35,26 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
     // _checkOrderCode(); // Bu satırı kaldırıyoruz, butona basıldığında çalışacak
   }
 
+  String _getStepTitle() {
+    if (_currentStep.isEmpty) {
+      return 'Processing...';
+    }
+    if (_currentStep.contains('Order Code')) {
+      return 'Checking Order Code';
+    }
+    if (_currentStep.contains('Config')) {
+      return 'Sending Config Deploy';
+    }
+    if (_currentStep.contains('Identity')) {
+      return 'Sending Identity Settings';
+    }
+    return 'Processing...';
+  }
+
   Future<void> _startProcess() async {
     setState(() {
       _processStarted = true;
+      _currentStep = '';
     });
     _checkOrderCode();
   }
@@ -47,6 +65,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
       _errorMessage = '';
       _isCompleted = false;
       _configDeploySent = false;
+      _currentStep = 'Order Code Kontrolü';
     });
 
     try {
@@ -115,11 +134,12 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
         onStepUpdate: (step) {
           if (mounted) {
             setState(() {
+              _currentStep = step;
               // Step güncellemelerini UI'ye yansıt
-              if (step.contains('identity')) {
-                _configDeploySent = false;
-              } else if (step.contains('config')) {
+              if (step.contains('Identity') || step == 'Identity') {
                 _configDeploySent = true;
+              } else if (step.contains('Config') || step == 'Config Deploy') {
+                _configDeploySent = false;
               }
             });
           }
@@ -255,17 +275,17 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
                     ),
                     child: const Text('Save'),
                   ),
-                ] else if (_isChecking && !_configDeploySent) ...[
+                ] else if (_isChecking) ...[
                   Image.asset(
                     'assets/icons/zenopix-favikon.gif',
                     width: 100,
                     height: 100,
                   ),
                   const SizedBox(height: 24),
-                  const Text(
-                    'Sending Identity Settings',
+                  Text(
+                    _getStepTitle(),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       color: Colors.black87,
@@ -273,33 +293,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    _configDeployAttempt > 0
-                        ? 'Attempt: $_configDeployAttempt/3'
-                        : 'Please wait...',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 14, color: Colors.grey),
-                  ),
-                ] else if (_isChecking && _configDeploySent) ...[
-                  Image.asset(
-                    'assets/icons/zenopix-favikon.gif',
-                    width: 100,
-                    height: 100,
-                  ),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Sending Config Deploy',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _configDeployAttempt > 0
-                        ? 'Attempt: $_configDeployAttempt/3'
-                        : 'Please wait...',
+                    _currentStep.isNotEmpty ? _currentStep : 'Please wait...',
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 14, color: Colors.grey),
                   ),

@@ -232,6 +232,7 @@ class BluetoothService {
     required List<int> identityData,
     required List<int> configData,
     bool renameDevice = true,
+    Function(String step)? onStepUpdate,
   }) async {
     String? foundUartServiceUuid;
     String? foundRxCharUuid;
@@ -303,21 +304,10 @@ class BluetoothService {
         debugPrint('✓ Tüm UUID\'ler başarıyla bulundu');
       }
 
-      // Identity settings gönder
+      // Önce config deploy gönder, sonra identity settings gönder
       if (targetChar != null) {
-        debugPrint('📤 Identity settings gönderiliyor, uzunluk: ${identityData.length}');
-
-        if (targetChar.properties.writeWithoutResponse) {
-          await targetChar.write(identityData, withoutResponse: true);
-        } else {
-          await targetChar.write(identityData, withoutResponse: false);
-        }
-
-        debugPrint('✓ Identity settings verisi gönderildi');
-        await Future.delayed(const Duration(milliseconds: 500));
-        identitySent = true;
-
         // Config deploy gönder
+        onStepUpdate?.call('Config Deploy');
         debugPrint('📤 Config deploy gönderiliyor, uzunluk: ${configData.length}');
 
         if (targetChar.properties.writeWithoutResponse) {
@@ -329,6 +319,20 @@ class BluetoothService {
         debugPrint('✓ Config deploy verisi gönderildi');
         await Future.delayed(const Duration(milliseconds: 500));
         configSent = true;
+
+        // Identity settings gönder
+        onStepUpdate?.call('Identity');
+        debugPrint('📤 Identity settings gönderiliyor, uzunluk: ${identityData.length}');
+
+        if (targetChar.properties.writeWithoutResponse) {
+          await targetChar.write(identityData, withoutResponse: true);
+        } else {
+          await targetChar.write(identityData, withoutResponse: false);
+        }
+
+        debugPrint('✓ Identity settings verisi gönderildi');
+        await Future.delayed(const Duration(milliseconds: 500));
+        identitySent = true;
       } else {
         debugPrint('❌ RX karakteristik bulunamadı');
       }

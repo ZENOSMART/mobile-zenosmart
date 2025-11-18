@@ -424,6 +424,7 @@ class DeviceSetupService {
   }) async {
     try {
       // Önce orderCode kontrolü yapılır
+      onStepUpdate?.call('Order Code Kontrolü');
       final deviceTypeModelId = await ensureDeviceTypeModel(orderCode);
 
       final deviceTypeName =
@@ -449,7 +450,6 @@ class DeviceSetupService {
       }
 
       // Identity settings paketini oluştur
-      onStepUpdate?.call('Preparing identity settings...');
       final identityData = DeviceSettingsHelper.createDeviceCredentials(
         devEui: devEui,
         joinEui: joinEui,
@@ -463,7 +463,6 @@ class DeviceSetupService {
       debugPrint('📤 Packet length: ${identityData.length} bytes');
 
       // Config settings paketini oluştur
-      onStepUpdate?.call('Preparing config settings...');
       final configData = DeviceSettingsHelper.createDeviceConfigSettings(
         latitude: latitude,
         longitude: longitude,
@@ -475,13 +474,14 @@ class DeviceSetupService {
       debugPrint('📤 Packet length: ${configData.length} bytes');
 
       // Tek bağlantıda tüm işlemleri yap
-      onStepUpdate?.call('Connecting to device...');
+      // Önce config deploy gönderilecek, sonra identity
       final result = await _bluetoothService.setupDeviceComplete(
         deviceId: uniqueKey,
         deviceName: name,
         identityData: identityData,
         configData: configData,
         renameDevice: renameDevice,
+        onStepUpdate: onStepUpdate,
       );
 
       // UUID'lerin başarıyla alınıp alınmadığını kontrol et

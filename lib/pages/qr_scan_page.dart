@@ -22,23 +22,44 @@ class _QrScanPageState extends State<QrScanPage> {
   }
 
   Future<void> _checkCameraPermission() async {
-    if (Platform.isIOS || Platform.isAndroid) {
-      final status = await Permission.camera.status;
-      if (status.isDenied) {
-        final result = await Permission.camera.request();
+    if (Platform.isAndroid) {
+      // Android'de izin kontrolü yap
+      try {
+        final status = await Permission.camera.status;
+        if (status.isDenied) {
+          final result = await Permission.camera.request();
+          if (mounted) {
+            setState(() {
+              _hasPermission = result.isGranted;
+              _permissionChecked = true;
+            });
+          }
+        } else {
+          if (mounted) {
+            setState(() {
+              _hasPermission = status.isGranted;
+              _permissionChecked = true;
+            });
+          }
+        }
+      } catch (e) {
         if (mounted) {
           setState(() {
-            _hasPermission = result.isGranted;
+            _hasPermission = true; // Hata durumunda MobileScanner'ın kontrolüne bırak
             _permissionChecked = true;
           });
         }
-      } else {
-        if (mounted) {
-          setState(() {
-            _hasPermission = status.isGranted;
-            _permissionChecked = true;
-          });
-        }
+      }
+    } else if (Platform.isIOS) {
+      // iOS'ta MobileScanner kendi izin kontrolünü yapar
+      // Info.plist'te NSCameraUsageDescription tanımlı olduğu için
+      // iOS otomatik olarak izin dialog'unu gösterir
+      // Biz sadece MobileScanner'ı çalıştıralım, o kendi kontrolünü yapacak
+      if (mounted) {
+        setState(() {
+          _hasPermission = true; // MobileScanner kendi kontrolünü yapacak
+          _permissionChecked = true;
+        });
       }
     } else {
       if (mounted) {
@@ -90,16 +111,23 @@ class _QrScanPageState extends State<QrScanPage> {
                     const SizedBox(height: 24),
                     ElevatedButton(
                       onPressed: () async {
+                        // İzin durumunu tekrar kontrol et
                         await _checkCameraPermission();
+                        // Hala izin yoksa ayarlara yönlendir
                         if (!_hasPermission && mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Please enable camera permission in Settings.',
-                              ),
-                              duration: Duration(seconds: 3),
-                            ),
-                          );
+                          final status = await Permission.camera.status;
+                          if (status.isPermanentlyDenied) {
+                            // Ayarlara yönlendir
+                            await openAppSettings();
+                          } else {
+                            // Tekrar iste
+                            final result = await Permission.camera.request();
+                            if (mounted) {
+                              setState(() {
+                                _hasPermission = result.isGranted;
+                              });
+                            }
+                          }
                         }
                       },
                       child: const Text('Grant Permission'),
@@ -112,13 +140,21 @@ class _QrScanPageState extends State<QrScanPage> {
               children: [
                 MobileScanner(
                   onDetect: (capture) {
-                    if (_handled || !_hasPermission) return;
+                    if (_handled) return;
                     final barcodes = capture.barcodes;
                     if (barcodes.isEmpty) return;
                     final raw = barcodes.first.rawValue;
                     if (raw == null || raw.isEmpty) return;
                     _handled = true;
                     Navigator.of(context).pop<String>(raw);
+                  },
+                  // iOS'ta MobileScanner kendi izin kontrolünü yapar
+                  errorBuilder: (context, error, child) {
+                    // Hata durumunda izin kontrolünü tekrar yap
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _checkCameraPermission();
+                    });
+                    return child ?? const SizedBox.shrink();
                   },
                 ),
           Align(

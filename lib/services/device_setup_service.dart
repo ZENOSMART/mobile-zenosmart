@@ -269,6 +269,91 @@ class DeviceSetupService {
     }
   }
 
+  /// Cihaza identity settings verisi gönderir (3 kez tekrarlar)
+  Future<bool> sendIdentitySettings({
+    required String uniqueKey,
+    required String devEui,
+    required String joinEui,
+    String? deviceAddr,
+    Function(int attempt)? onAttempt,
+  }) async {
+    try {
+      // DeviceAddr'ı parse et (4 byte olmalı)
+      List<int>? deviceAddrBytes;
+      if (deviceAddr != null && deviceAddr.isNotEmpty) {
+        deviceAddrBytes = _hexStringToBytes(deviceAddr);
+        if (deviceAddrBytes == null || deviceAddrBytes.length != 4) {
+          debugPrint('❌ DeviceAddr geçersiz: $deviceAddr');
+          return false;
+        }
+      }
+
+      // Identity settings paketini oluştur
+      final identityData = DeviceSettingsHelper.createDeviceCredentials(
+        devEui: devEui,
+        joinEui: joinEui,
+        deviceAddr: deviceAddrBytes,
+        counter: 1,
+        groupId: 3,
+      );
+
+      debugPrint('📤 Identity settings paketi oluşturuldu');
+      debugPrint('📤 DevEUI: $devEui, JoinEUI: $joinEui');
+      debugPrint('📤 Packet length: ${identityData.length} bytes');
+
+      // Identity settings verisini 3 kez gönder
+      bool success = false;
+      for (int i = 0; i < 3; i++) {
+        // Deneme sayısını bildir
+        onAttempt?.call(i + 1);
+
+        debugPrint('📤 Identity settings gönderiliyor, deneme: ${i + 1}');
+        success = await _bluetoothService.sendIdentitySettings(
+          deviceId: uniqueKey,
+          identityData: identityData,
+        );
+
+        if (success) {
+          debugPrint(
+            '✅ Identity settings başarıyla gönderildi, deneme: ${i + 1}',
+          );
+          break;
+        } else {
+          debugPrint('❌ Identity settings gönderilemedi, deneme: ${i + 1}');
+          // Bekleme süresi ekle
+          if (i < 2) {
+            // Son denemeden sonra bekleme
+            await Future.delayed(const Duration(seconds: 1));
+          }
+        }
+      }
+
+      return success;
+    } catch (e) {
+      debugPrint('❌ Identity settings gönderme hatası: $e');
+      return false;
+    }
+  }
+
+  /// Hex string'i byte listesine çevirir
+  List<int>? _hexStringToBytes(String hexString) {
+    try {
+      final hex = hexString
+          .replaceAll(RegExp(r'[^0-9a-fA-F]'), '')
+          .toUpperCase();
+      if (hex.length % 2 != 0) {
+        return null;
+      }
+      final result = <int>[];
+      for (var i = 0; i < hex.length; i += 2) {
+        result.add(int.parse(hex.substring(i, i + 2), radix: 16));
+      }
+      return result;
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// Cihaza config settings verisi gönderir (3 kez tekrarlar)
   Future<bool> sendConfigDeploy({
     required String uniqueKey,

@@ -114,7 +114,10 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
         renameDevice: true,
       );
 
-      // Cihaz kurulumu tamamlandı, şimdi config deploy gönder
+      // Önce identity settings gönder
+      await _sendIdentitySettings();
+
+      // Sonra config deploy gönder
       await _sendConfigDeploy();
     } catch (e) {
       String userFriendlyMessage = 'An unknown error occurred';
@@ -154,6 +157,80 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
           _isChecking = false;
           _isCompleted = false;
           _processStarted = false; // Reset process started state on error
+        });
+      }
+    }
+  }
+
+  Future<void> _sendIdentitySettings() async {
+    try {
+      // Identity settings verisini gönder (3 kez denenecek)
+      final result = await _deviceSetupService.sendIdentitySettings(
+        uniqueKey: widget.draft.uniqueKey,
+        devEui: widget.draft.devEui,
+        joinEui: widget.draft.joinEui,
+        deviceAddr: widget.draft.deviceAddr,
+        onAttempt: (attempt) {
+          // Deneme sayısını UI'ye bildir
+          if (mounted) {
+            setState(() {
+              _configDeployAttempt = attempt;
+            });
+          }
+        },
+      );
+
+      if (!result) {
+        // Identity settings başarısız
+        if (mounted) {
+          setState(() {
+            _errorMessage =
+                'Identity settings could not be sent. Please try again later.';
+            _isChecking = false;
+            _isCompleted = false;
+            _processStarted = false;
+            _configDeploySent = false;
+            _configDeployAttempt = 0;
+          });
+        }
+        return; // Identity başarısızsa config gönderme
+      } else {
+        debugPrint('✅ Identity settings başarıyla gönderildi');
+        // Identity başarılı, şimdi config gönderebiliriz
+        if (mounted) {
+          setState(() {
+            _configDeploySent = false; // Config göndermeye başla
+            _configDeployAttempt = 0;
+          });
+        }
+      }
+    } catch (e) {
+      String userFriendlyMessage = 'An unknown error occurred';
+
+      // Make error message user-friendly
+      if (e is Exception) {
+        String errorMessage = e.toString();
+
+        // Bluetooth connection error
+        if (errorMessage.contains('Bluetooth')) {
+          userFriendlyMessage =
+              'Bluetooth connection could not be established. Please make sure you are near the device and Bluetooth is enabled.';
+        }
+        // Other errors
+        else {
+          userFriendlyMessage =
+              'An error occurred while sending identity settings. Please try again later.';
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _errorMessage = userFriendlyMessage;
+          _isChecking = false;
+          _isCompleted = false;
+          _processStarted = false;
+          _configDeploySent = false;
+          _configDeployAttempt = 0;
         });
       }
     }
@@ -244,163 +321,169 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-            if (!_processStarted) ...[
-              // Initial state with save button
-              const Icon(Icons.settings, color: Color(0xFF008E46), size: 64),
-              const SizedBox(height: 24),
-              const Text(
-                'Device Setup',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Press the "Save" button to load device configurations',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _startProcess,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF008E46),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+                if (!_processStarted) ...[
+                  // Initial state with save button
+                  const Icon(
+                    Icons.settings,
+                    color: Color(0xFF008E46),
+                    size: 64,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Device Setup',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
-                child: const Text('Save'),
-              ),
-            ] else if (_isChecking && !_configDeploySent) ...[
-              Image.asset(
-                'assets/icons/zenopix-favikon.gif',
-                width: 100,
-                height: 100,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Loading Device Configurations',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Please wait...',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-            ] else if (_isChecking && _configDeploySent) ...[
-              Image.asset(
-                'assets/icons/zenopix-favikon.gif',
-                width: 100,
-                height: 100,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Sending Config Deploy',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _configDeployAttempt > 0
-                    ? 'Attempt: $_configDeployAttempt/3'
-                    : 'Please wait...',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-            ] else if (_errorMessage.isNotEmpty) ...[
-              const Icon(Icons.error_outline, color: Colors.red, size: 64),
-              const SizedBox(height: 24),
-              const Text(
-                'Operation Failed',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _errorMessage,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _startProcess,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF008E46),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Press the "Save" button to load device configurations',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: _startProcess,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF008E46),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Save'),
                   ),
-                ),
-                child: const Text('Retry'),
-              ),
-            ] else if (_isCompleted) ...[
-              const Icon(
-                Icons.check_circle,
-                color: Color(0xFF008E46),
-                size: 64,
-              ),
-              const SizedBox(height: 24),
-              const Text(
-                'Setup Completed',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Device has been successfully configured',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.grey),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: widget.onSetupComplete,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF008E46),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
+                ] else if (_isChecking && !_configDeploySent) ...[
+                  Image.asset(
+                    'assets/icons/zenopix-favikon.gif',
+                    width: 100,
+                    height: 100,
                   ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Sending Identity Settings',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
                   ),
-                ),
-                child: const Text('Continue'),
-              ),
-            ] else ...[
-              // Empty state or initial state
-              Container(),
-            ],
+                  const SizedBox(height: 8),
+                  Text(
+                    _configDeployAttempt > 0
+                        ? 'Attempt: $_configDeployAttempt/3'
+                        : 'Please wait...',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                ] else if (_isChecking && _configDeploySent) ...[
+                  Image.asset(
+                    'assets/icons/zenopix-favikon.gif',
+                    width: 100,
+                    height: 100,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Sending Config Deploy',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _configDeployAttempt > 0
+                        ? 'Attempt: $_configDeployAttempt/3'
+                        : 'Please wait...',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                ] else if (_errorMessage.isNotEmpty) ...[
+                  const Icon(Icons.error_outline, color: Colors.red, size: 64),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Operation Failed',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    _errorMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: _startProcess,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF008E46),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Retry'),
+                  ),
+                ] else if (_isCompleted) ...[
+                  const Icon(
+                    Icons.check_circle,
+                    color: Color(0xFF008E46),
+                    size: 64,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Setup Completed',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Device has been successfully configured',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: widget.onSetupComplete,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF008E46),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Continue'),
+                  ),
+                ] else ...[
+                  // Empty state or initial state
+                  Container(),
+                ],
               ],
             ),
           ),

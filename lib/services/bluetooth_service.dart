@@ -91,6 +91,73 @@ class BluetoothService {
     );
   }
 
+  /// Cihaza identity settings verisi gönderir
+  Future<bool> sendIdentitySettings({
+    required String deviceId,
+    required List<int> identityData,
+  }) async {
+    try {
+      final device = BluetoothDevice.fromId(deviceId);
+
+      // Cihaza bağlan
+      await device.connect(timeout: const Duration(seconds: 10));
+
+      // Servisleri keşfet
+      final services = await device.discoverServices();
+
+      BluetoothCharacteristic? targetChar;
+
+      // UART servisini ve karakteristiklerini bul
+      for (var service in services) {
+        final serviceUuid = service.uuid.toString().toLowerCase();
+
+        if (serviceUuid.startsWith(_uartServicePrefix)) {
+          for (var char in service.characteristics) {
+            final charUuid = char.uuid.toString().toLowerCase();
+
+            // RX karakteristiği
+            if (charUuid.startsWith(_rxCharPrefix)) {
+              if (char.properties.write ||
+                  char.properties.writeWithoutResponse) {
+                targetChar = char;
+                debugPrint('✓ RX karakteristik bulundu: $charUuid');
+              }
+            }
+          }
+          break;
+        }
+      }
+
+      // Identity settings verisini gönder
+      if (targetChar != null) {
+        debugPrint(
+          'Identity settings verisi gönderiliyor, uzunluk: ${identityData.length}',
+        );
+
+        if (targetChar.properties.writeWithoutResponse) {
+          await targetChar.write(identityData, withoutResponse: true);
+        } else {
+          await targetChar.write(identityData, withoutResponse: false);
+        }
+
+        debugPrint('✓ Identity settings verisi gönderildi');
+        await Future.delayed(const Duration(milliseconds: 500));
+
+        // Bağlantıyı kes
+        await device.disconnect();
+        return true;
+      } else {
+        debugPrint('RX karakteristik bulunamadı');
+        // Bağlantıyı kes
+        await device.disconnect();
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Identity settings gönderme hatası: $e');
+      return false;
+    }
+  }
+
   /// Cihaza config deploy verisi gönderir
   Future<bool> sendConfigDeploy({
     required String deviceId,

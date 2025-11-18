@@ -23,6 +23,8 @@ class _ScanPageState extends State<ScanPage> {
   StreamSubscription<BluetoothAdapterState>? _adapterStateSub;
   DeviceType? _selectedDeviceType;
   Set<String> _existingKeys = {};
+  bool _isBluetoothDialogShowing = false;
+  BluetoothAdapterState? _lastAdapterState;
 
   @override
   void initState() {
@@ -30,17 +32,49 @@ class _ScanPageState extends State<ScanPage> {
     _selectedDeviceType = widget.deviceType;
     // Bluetooth durumunu dinle
     _adapterStateSub = FlutterBluePlus.adapterState.listen((state) {
-      if (mounted && state != BluetoothAdapterState.on) {
-        _showBluetoothOffDialog();
+      if (!mounted) return;
+      _lastAdapterState = state;
+      
+      // iOS'ta bazen geçici durum değişiklikleri olabilir, bir süre bekle
+      if (state != BluetoothAdapterState.on) {
+        // Eğer dialog zaten açıksa tekrar açma
+        if (!_isBluetoothDialogShowing) {
+          Future.delayed(const Duration(milliseconds: 500), () {
+            if (mounted && _lastAdapterState != BluetoothAdapterState.on) {
+              _showBluetoothOffDialog();
+            }
+          });
+        }
+      } else {
+        // Bluetooth açıldıysa dialog'u kapat
+        if (_isBluetoothDialogShowing) {
+          Navigator.of(context).pop();
+          _isBluetoothDialogShowing = false;
+        }
+        // Eğer tarama yapılmıyorsa başlat
+        if (!_isScanning) {
+          _startScan();
+        }
       }
     });
     // Sayfa açıldığında Bluetooth kontrolü ve otomatik tarama
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final adapterState = await FlutterBluePlus.adapterState.first;
-      if (adapterState == BluetoothAdapterState.on) {
-        await _startScan();
-      } else {
-        _showBluetoothOffDialog();
+      // Önce izinleri kontrol et
+      if (await _ensurePermissions()) {
+        // iOS'ta durumu birkaç kez kontrol et
+        BluetoothAdapterState? adapterState;
+        for (int i = 0; i < 3; i++) {
+          adapterState = await FlutterBluePlus.adapterState.first;
+          if (adapterState == BluetoothAdapterState.on) break;
+          await Future.delayed(const Duration(milliseconds: 300));
+        }
+        
+        if (adapterState == BluetoothAdapterState.on) {
+          await _startScan();
+        } else if (adapterState != BluetoothAdapterState.unauthorized) {
+          // Unauthorized durumunda zaten _ensurePermissions mesaj gösterdi
+          _showBluetoothOffDialog();
+        }
       }
     });
   }
@@ -54,7 +88,9 @@ class _ScanPageState extends State<ScanPage> {
   }
 
   void _showBluetoothOffDialog() {
-    if (!mounted) return;
+    if (!mounted || _isBluetoothDialogShowing) return;
+    
+    _isBluetoothDialogShowing = true;
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -71,7 +107,10 @@ class _ScanPageState extends State<ScanPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              Navigator.of(context).pop();
+              _isBluetoothDialogShowing = false;
+            },
             child: const Text('OK'),
           ),
           ElevatedButton(
@@ -81,10 +120,24 @@ class _ScanPageState extends State<ScanPage> {
             ),
             onPressed: () async {
               Navigator.of(context).pop();
+              _isBluetoothDialogShowing = false;
               // Bluetooth'u açmayı dene
               try {
                 if (Platform.isAndroid) {
                   await FlutterBluePlus.turnOn();
+                } else if (Platform.isIOS) {
+                  // iOS'ta Bluetooth'u programatik olarak açamayız
+                  // Kullanıcıya ayarlara yönlendir
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Please turn on Bluetooth from Settings > Bluetooth',
+                        ),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
                 }
               } catch (e) {
                 // Bazı cihazlarda otomatik açma desteklenmeyebilir
@@ -103,35 +156,105 @@ class _ScanPageState extends State<ScanPage> {
           ),
         ],
       ),
-    );
+    ).then((_) {
+      _isBluetoothDialogShowing = false;
+    });
   }
 
   Future<bool> _ensurePermissions() async {
-    if (!Platform.isAndroid) return true;
-    final req = await [
-      Permission.bluetoothScan,
-      Permission.bluetoothConnect,
-      Permission.locationWhenInUse,
-    ].request();
-    final ok = req.values.every((s) => s.isGranted);
-    return ok;
+    if (Platform.isAndroid) {
+      final req = await [
+        Permission.bluetoothScan,
+        Permission.bluetoothConnect,
+        Permission.locationWhenInUse,
+      ].request();
+      final ok = req.values.every((s) => s.isGranted);
+      return ok;
+    } else if (Platform.isIOS) {
+      // iOS'ta Bluetooth izinleri otomatik olarak istenir (Info.plist'te tanımlı)
+      // iOS'ta Bluetooth durumunu kontrol et
+      try {
+        final adapterState = await FlutterBluePlus.adapterState.first;
+        // iOS'ta adapterState.unauthorized durumu izin reddedildiğinde olabilir
+        if (adapterState == BluetoothAdapterState.unauthorized) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Bluetooth permission is required. Please enable it in Settings.',
+                ),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          }
+          return false;
+        }
+        
+        // iOS'ta Bluetooth scan için konum izni de gerekebilir (iOS 13+)
+        final locationStatus = await Permission.locationWhenInUse.status;
+        if (locationStatus.isDenied) {
+          final locationResult = await Permission.locationWhenInUse.request();
+          if (!locationResult.isGranted && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text(
+                  'Location permission is required for Bluetooth scanning on iOS.',
+                ),
+                duration: Duration(seconds: 4),
+              ),
+            );
+            return false;
+          }
+        }
+        
+        return adapterState == BluetoothAdapterState.on;
+      } catch (e) {
+        // Hata durumunda false döndür
+        return false;
+      }
+    }
+    return true;
   }
 
   Future<void> _startScan() async {
     if (_isScanning) return;
 
-    // Bluetooth durumunu kontrol et
-    final adapterState = await FlutterBluePlus.adapterState.first;
-    if (adapterState != BluetoothAdapterState.on) {
-      _showBluetoothOffDialog();
+    // Önce izinleri kontrol et (iOS'ta da durum kontrolü yapar)
+    if (!await _ensurePermissions()) {
+      if (mounted && !_isBluetoothDialogShowing) {
+        // iOS'ta unauthorized durumu için özel mesaj
+        final adapterState = await FlutterBluePlus.adapterState.first;
+        if (adapterState == BluetoothAdapterState.unauthorized) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Bluetooth permission denied. Please enable it in Settings > Privacy & Security > Bluetooth.',
+              ),
+              duration: Duration(seconds: 5),
+            ),
+          );
+        } else {
+          _showBluetoothOffDialog();
+        }
+      }
       return;
     }
 
-    if (!await _ensurePermissions()) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bluetooth permissions required.')),
-        );
+    // Bluetooth durumunu kontrol et - iOS'ta birkaç kez kontrol et
+    BluetoothAdapterState adapterState = await FlutterBluePlus.adapterState.first;
+    
+    // iOS'ta bazen ilk kontrol yanlış olabilir, birkaç kez dene
+    if (Platform.isIOS && adapterState != BluetoothAdapterState.on) {
+      for (int i = 0; i < 2; i++) {
+        await Future.delayed(const Duration(milliseconds: 200));
+        adapterState = await FlutterBluePlus.adapterState.first;
+        if (adapterState == BluetoothAdapterState.on) break;
+      }
+    }
+    
+    if (adapterState != BluetoothAdapterState.on) {
+      if (!_isBluetoothDialogShowing) {
+        _showBluetoothOffDialog();
       }
       return;
     }

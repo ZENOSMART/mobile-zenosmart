@@ -36,17 +36,17 @@
 	</array>
   <!-- Bluetooth usage descriptions -->
   <key>NSBluetoothAlwaysUsageDescription</key>
-  <string>This app uses Bluetooth to discover and connect to nearby devices.</string>
+  <string>This app needs Bluetooth access to scan and connect to Zenosmart devices.</string>
   <key>NSBluetoothPeripheralUsageDescription</key>
-  <string>This app needs Bluetooth access to connect to devices.</string>
+  <string>This app needs Bluetooth access to scan and connect to Zenosmart devices.</string>
   <!-- Location usage descriptions -->
   <key>NSLocationWhenInUseUsageDescription</key>
-  <string>Location access is required to set device location and use map features.</string>
+  <string>This app needs location access to show your current position on the map and set device locations.</string>
   <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-  <string>Location access is required to set device location and use map features.</string>
+  <string>This app needs location access to show your current position on the map and set device locations.</string>
   <!-- Camera usage description -->
   <key>NSCameraUsageDescription</key>
-  <string>Camera access is required to scan QR codes.</string>
+  <string>Camera access is required to scan QR codes for device setup.</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

@@ -406,4 +406,140 @@ class DeviceSetupService {
       return false;
     }
   }
+
+  /// Tek bağlantıda cihaz kurulumunu yapar (UUID alma, identity ve config gönderme)
+  Future<DeviceSetupCompleteResult> setupDeviceComplete({
+    required String uniqueKey,
+    required String name,
+    required String orderCode,
+    required String devEui,
+    required String joinEui,
+    required double latitude,
+    required double longitude,
+    required String location,
+    String? deviceType,
+    String? deviceAddr,
+    bool renameDevice = true,
+    Function(String step)? onStepUpdate,
+  }) async {
+    try {
+      // Önce orderCode kontrolü yapılır
+      final deviceTypeModelId = await ensureDeviceTypeModel(orderCode);
+
+      final deviceTypeName =
+          DeviceType.displayNameBySerial(deviceType) ?? deviceType;
+
+      final deviceId = await _deviceRepo.upsert(
+        uniqueData: uniqueKey,
+        name: name.isEmpty ? null : name,
+        deviceType: deviceType,
+        deviceTypeName: deviceTypeName,
+        deviceTypeId: deviceTypeModelId,
+        orderCode: orderCode,
+      );
+
+      // DeviceAddr'ı parse et (4 byte olmalı)
+      List<int>? deviceAddrBytes;
+      if (deviceAddr != null && deviceAddr.isNotEmpty) {
+        deviceAddrBytes = _hexStringToBytes(deviceAddr);
+        if (deviceAddrBytes == null || deviceAddrBytes.length != 4) {
+          debugPrint('❌ DeviceAddr geçersiz: $deviceAddr');
+          throw Exception('DeviceAddr geçersiz: $deviceAddr');
+        }
+      }
+
+      // Identity settings paketini oluştur
+      onStepUpdate?.call('Preparing identity settings...');
+      final identityData = DeviceSettingsHelper.createDeviceCredentials(
+        devEui: devEui,
+        joinEui: joinEui,
+        deviceAddr: deviceAddrBytes,
+        counter: 1,
+        groupId: 3,
+      );
+
+      debugPrint('📤 Identity settings paketi oluşturuldu');
+      debugPrint('📤 DevEUI: $devEui, JoinEUI: $joinEui');
+      debugPrint('📤 Packet length: ${identityData.length} bytes');
+
+      // Config settings paketini oluştur
+      onStepUpdate?.call('Preparing config settings...');
+      final configData = DeviceSettingsHelper.createDeviceConfigSettings(
+        latitude: latitude,
+        longitude: longitude,
+        counter: 1,
+      );
+
+      debugPrint('📤 Config settings paketi oluşturuldu');
+      debugPrint('📤 Latitude: $latitude, Longitude: $longitude');
+      debugPrint('📤 Packet length: ${configData.length} bytes');
+
+      // Tek bağlantıda tüm işlemleri yap
+      onStepUpdate?.call('Connecting to device...');
+      final result = await _bluetoothService.setupDeviceComplete(
+        deviceId: uniqueKey,
+        deviceName: name,
+        identityData: identityData,
+        configData: configData,
+        renameDevice: renameDevice,
+      );
+
+      // UUID'lerin başarıyla alınıp alınmadığını kontrol et
+      if (result.uartServiceUuid != null ||
+          result.rxCharUuid != null ||
+          result.txCharUuid != null) {
+        debugPrint('📝 UUID\'ler veritabanına kaydediliyor...');
+        debugPrint(
+          '  UART Service: ${result.uartServiceUuid ?? "null (korunacak)"}',
+        );
+        debugPrint('  RX Char: ${result.rxCharUuid ?? "null (korunacak)"}');
+        debugPrint('  TX Char: ${result.txCharUuid ?? "null (korunacak)"}');
+      } else {
+        debugPrint(
+          '⚠️ Uyarı: Hiçbir UUID bulunamadı, mevcut UUID\'ler korunacak',
+        );
+      }
+
+      // Cihaz detaylarını veritabanına kaydet
+      await _detailRepo.upsert(
+        deviceId: deviceId,
+        uartServiceUuid: result.uartServiceUuid,
+        rxCharUuid: result.rxCharUuid,
+        txCharUuid: result.txCharUuid,
+      );
+
+      debugPrint('✅ Cihaz detayları başarıyla kaydedildi');
+      debugPrint('✅ Identity settings gönderildi: ${result.identitySent}');
+      debugPrint('✅ Config deploy gönderildi: ${result.configSent}');
+
+      return DeviceSetupCompleteResult(
+        success: result.identitySent && result.configSent,
+        identitySent: result.identitySent,
+        configSent: result.configSent,
+      );
+    } catch (e) {
+      debugPrint('❌ Device setup complete hatası: $e');
+      // Detaylı hata mesajı oluştur
+      if (e is Exception) {
+        rethrow; // Zaten özel bir hata mesajı varsa olduğu gibi fırlat
+      } else {
+        // Beklenmeyen hata durumunda daha açıklayıcı mesaj
+        throw Exception(
+          'Cihaz kurulumu sırasında hata oluştu: ${e.toString()}',
+        );
+      }
+    }
+  }
+}
+
+class DeviceSetupCompleteResult {
+  final bool success;
+  final bool identitySent;
+  final bool configSent;
+
+  DeviceSetupCompleteResult({
+    required this.success,
+    required this.identitySent,
+    required this.configSent,
+  });
 }

@@ -99,8 +99,8 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
 
   Future<void> _setupDevice() async {
     try {
-      // Cihaz kurulumunu yap
-      await _deviceSetupService.setupDevice(
+      // Tek bağlantıda tüm cihaz kurulumunu yap
+      final result = await _deviceSetupService.setupDeviceComplete(
         uniqueKey: widget.draft.uniqueKey,
         name: widget.draft.name,
         orderCode: widget.draft.orderCode,
@@ -112,13 +112,49 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
         deviceType: widget.draft.deviceType,
         deviceAddr: widget.draft.deviceAddr,
         renameDevice: true,
+        onStepUpdate: (step) {
+          if (mounted) {
+            setState(() {
+              // Step güncellemelerini UI'ye yansıt
+              if (step.contains('identity')) {
+                _configDeploySent = false;
+              } else if (step.contains('config')) {
+                _configDeploySent = true;
+              }
+            });
+          }
+        },
       );
 
-      // Önce identity settings gönder
-      await _sendIdentitySettings();
-
-      // Sonra config deploy gönder
-      await _sendConfigDeploy();
+      // Sonucu kontrol et
+      if (result.success) {
+        if (mounted) {
+          setState(() {
+            _isChecking = false;
+            _isCompleted = true;
+            _configDeploySent = true;
+            _configDeployAttempt = 0;
+          });
+        }
+      } else {
+        String errorMsg = 'Device setup failed. ';
+        if (!result.identitySent) {
+          errorMsg += 'Identity settings could not be sent. ';
+        }
+        if (!result.configSent) {
+          errorMsg += 'Config deploy could not be sent.';
+        }
+        if (mounted) {
+          setState(() {
+            _errorMessage = errorMsg;
+            _isChecking = false;
+            _isCompleted = false;
+            _processStarted = false;
+            _configDeploySent = false;
+            _configDeployAttempt = 0;
+          });
+        }
+      }
     } catch (e) {
       String userFriendlyMessage = 'An unknown error occurred';
 
@@ -144,6 +180,11 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
           userFriendlyMessage =
               'A database error occurred. Please try again later.';
         }
+        // Bluetooth connection error
+        else if (errorMessage.contains('Bluetooth')) {
+          userFriendlyMessage =
+              'Bluetooth connection could not be established. Please make sure you are near the device and Bluetooth is enabled.';
+        }
         // Other errors
         else {
           userFriendlyMessage =
@@ -162,152 +203,6 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
     }
   }
 
-  Future<void> _sendIdentitySettings() async {
-    try {
-      // Identity settings verisini gönder (3 kez denenecek)
-      final result = await _deviceSetupService.sendIdentitySettings(
-        uniqueKey: widget.draft.uniqueKey,
-        devEui: widget.draft.devEui,
-        joinEui: widget.draft.joinEui,
-        deviceAddr: widget.draft.deviceAddr,
-        onAttempt: (attempt) {
-          // Deneme sayısını UI'ye bildir
-          if (mounted) {
-            setState(() {
-              _configDeployAttempt = attempt;
-            });
-          }
-        },
-      );
-
-      if (!result) {
-        // Identity settings başarısız
-        if (mounted) {
-          setState(() {
-            _errorMessage =
-                'Identity settings could not be sent. Please try again later.';
-            _isChecking = false;
-            _isCompleted = false;
-            _processStarted = false;
-            _configDeploySent = false;
-            _configDeployAttempt = 0;
-          });
-        }
-        return; // Identity başarısızsa config gönderme
-      } else {
-        debugPrint('✅ Identity settings başarıyla gönderildi');
-        // Identity başarılı, şimdi config gönderebiliriz
-        if (mounted) {
-          setState(() {
-            _configDeploySent = false; // Config göndermeye başla
-            _configDeployAttempt = 0;
-          });
-        }
-      }
-    } catch (e) {
-      String userFriendlyMessage = 'An unknown error occurred';
-
-      // Make error message user-friendly
-      if (e is Exception) {
-        String errorMessage = e.toString();
-
-        // Bluetooth connection error
-        if (errorMessage.contains('Bluetooth')) {
-          userFriendlyMessage =
-              'Bluetooth connection could not be established. Please make sure you are near the device and Bluetooth is enabled.';
-        }
-        // Other errors
-        else {
-          userFriendlyMessage =
-              'An error occurred while sending identity settings. Please try again later.';
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _errorMessage = userFriendlyMessage;
-          _isChecking = false;
-          _isCompleted = false;
-          _processStarted = false;
-          _configDeploySent = false;
-          _configDeployAttempt = 0;
-        });
-      }
-    }
-  }
-
-  Future<void> _sendConfigDeploy() async {
-    try {
-      // Config deploy verisini gönder (3 kez denenecek)
-      final result = await _deviceSetupService.sendConfigDeploy(
-        uniqueKey: widget.draft.uniqueKey,
-        latitude: widget.draft.latitude!,
-        longitude: widget.draft.longitude!,
-        onAttempt: (attempt) {
-          // Deneme sayısını UI'ye bildir
-          if (mounted) {
-            setState(() {
-              _configDeployAttempt = attempt;
-            });
-          }
-        },
-      );
-
-      if (result) {
-        // Config deploy başarılı
-        if (mounted) {
-          setState(() {
-            _isChecking = false;
-            _isCompleted = true;
-            _configDeploySent = true;
-            _configDeployAttempt = 0; // Başarılı olunca sıfırla
-          });
-        }
-      } else {
-        // Config deploy başarısız
-        if (mounted) {
-          setState(() {
-            _errorMessage =
-                'Config deploy could not be sent. Please try again later.';
-            _isChecking = false;
-            _isCompleted = false;
-            _processStarted = false;
-            _configDeploySent = false;
-            _configDeployAttempt = 0; // Reset on error
-          });
-        }
-      }
-    } catch (e) {
-      String userFriendlyMessage = 'An unknown error occurred';
-
-      // Make error message user-friendly
-      if (e is Exception) {
-        String errorMessage = e.toString();
-
-        // Bluetooth connection error
-        if (errorMessage.contains('Bluetooth')) {
-          userFriendlyMessage =
-              'Bluetooth connection could not be established. Please make sure you are near the device and Bluetooth is enabled.';
-        }
-        // Other errors
-        else {
-          userFriendlyMessage =
-              'An error occurred while sending config deploy. Please try again later.';
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _errorMessage = userFriendlyMessage;
-          _isChecking = false;
-          _isCompleted = false;
-          _processStarted = false;
-          _configDeploySent = false;
-          _configDeployAttempt = 0; // Hata olunca sıfırla
-        });
-      }
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

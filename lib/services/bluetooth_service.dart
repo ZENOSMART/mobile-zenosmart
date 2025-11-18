@@ -224,6 +224,144 @@ class BluetoothService {
       return false;
     }
   }
+
+  /// Tek bağlantıda UUID'leri alır, identity settings ve config deploy gönderir
+  Future<DeviceSetupResult> setupDeviceComplete({
+    required String deviceId,
+    required String deviceName,
+    required List<int> identityData,
+    required List<int> configData,
+    bool renameDevice = true,
+  }) async {
+    String? foundUartServiceUuid;
+    String? foundRxCharUuid;
+    String? foundTxCharUuid;
+    bool identitySent = false;
+    bool configSent = false;
+
+    BluetoothDevice? device;
+    BluetoothCharacteristic? targetChar;
+
+    try {
+      device = BluetoothDevice.fromId(deviceId);
+
+      // Tek seferde bağlan
+      debugPrint('🔌 Cihaza bağlanılıyor...');
+      await device.connect(timeout: const Duration(seconds: 10));
+
+      // Servisleri keşfet
+      debugPrint('🔍 Servisler keşfediliyor...');
+      final services = await device.discoverServices();
+
+      debugPrint('=== TÜM SERVİSLER ===');
+      for (var service in services) {
+        debugPrint('Servis: ${service.uuid}');
+        for (var char in service.characteristics) {
+          debugPrint('  - Karakteristik: ${char.uuid}');
+        }
+      }
+
+      // UART servisini ve karakteristiklerini bul
+      for (var service in services) {
+        final serviceUuid = service.uuid.toString().toLowerCase();
+
+        if (serviceUuid.startsWith(_uartServicePrefix)) {
+          foundUartServiceUuid = serviceUuid;
+          debugPrint('✓ UART servisi bulundu: $serviceUuid');
+
+          for (var char in service.characteristics) {
+            final charUuid = char.uuid.toString().toLowerCase();
+
+            // RX karakteristiği
+            if (charUuid.startsWith(_rxCharPrefix)) {
+              foundRxCharUuid = charUuid;
+              debugPrint('✓ RX karakteristik bulundu: $charUuid');
+              if (char.properties.write ||
+                  char.properties.writeWithoutResponse) {
+                targetChar = char;
+              }
+            }
+            // TX karakteristiği
+            else if (charUuid.startsWith(_txCharPrefix)) {
+              foundTxCharUuid = charUuid;
+              debugPrint('✓ TX karakteristik bulundu: $charUuid');
+            }
+          }
+          break;
+        }
+      }
+
+      // UUID'lerin bulunup bulunmadığını kontrol et
+      if (foundUartServiceUuid == null ||
+          foundRxCharUuid == null ||
+          foundTxCharUuid == null) {
+        debugPrint('⚠️ Uyarı: Bazı UUID\'ler bulunamadı:');
+        debugPrint('  UART Service: ${foundUartServiceUuid ?? "BULUNAMADI"}');
+        debugPrint('  RX Char: ${foundRxCharUuid ?? "BULUNAMADI"}');
+        debugPrint('  TX Char: ${foundTxCharUuid ?? "BULUNAMADI"}');
+      } else {
+        debugPrint('✓ Tüm UUID\'ler başarıyla bulundu');
+      }
+
+      // Identity settings gönder
+      if (targetChar != null) {
+        debugPrint('📤 Identity settings gönderiliyor, uzunluk: ${identityData.length}');
+
+        if (targetChar.properties.writeWithoutResponse) {
+          await targetChar.write(identityData, withoutResponse: true);
+        } else {
+          await targetChar.write(identityData, withoutResponse: false);
+        }
+
+        debugPrint('✓ Identity settings verisi gönderildi');
+        await Future.delayed(const Duration(milliseconds: 500));
+        identitySent = true;
+
+        // Config deploy gönder
+        debugPrint('📤 Config deploy gönderiliyor, uzunluk: ${configData.length}');
+
+        if (targetChar.properties.writeWithoutResponse) {
+          await targetChar.write(configData, withoutResponse: true);
+        } else {
+          await targetChar.write(configData, withoutResponse: false);
+        }
+
+        debugPrint('✓ Config deploy verisi gönderildi');
+        await Future.delayed(const Duration(milliseconds: 500));
+        configSent = true;
+      } else {
+        debugPrint('❌ RX karakteristik bulunamadı');
+      }
+
+      // Bağlantıyı kes
+      await device.disconnect();
+      debugPrint('🔌 Bağlantı kesildi');
+
+      return DeviceSetupResult(
+        uartServiceUuid: foundUartServiceUuid,
+        rxCharUuid: foundRxCharUuid,
+        txCharUuid: foundTxCharUuid,
+        identitySent: identitySent,
+        configSent: configSent,
+      );
+    } catch (e) {
+      debugPrint('❌ Device setup hatası: $e');
+      // Hata durumunda bağlantıyı kesmeyi dene
+      try {
+        if (device != null) {
+          await device.disconnect();
+        }
+      } catch (_) {}
+      // Hata durumunda da mevcut UUID'leri korumak için null dönüyoruz
+      return DeviceSetupResult(
+        uartServiceUuid: foundUartServiceUuid,
+        rxCharUuid: foundRxCharUuid,
+        txCharUuid: foundTxCharUuid,
+        identitySent: identitySent,
+        configSent: configSent,
+      );
+    }
+  }
 }
 
 class BluetoothConnectionResult {
@@ -244,4 +382,20 @@ class BluetoothConnectionResult {
       'txCharUuid': txCharUuid,
     };
   }
+}
+
+class DeviceSetupResult {
+  final String? uartServiceUuid;
+  final String? rxCharUuid;
+  final String? txCharUuid;
+  final bool identitySent;
+  final bool configSent;
+
+  DeviceSetupResult({
+    this.uartServiceUuid,
+    this.rxCharUuid,
+    this.txCharUuid,
+    required this.identitySent,
+    required this.configSent,
+  });
 }

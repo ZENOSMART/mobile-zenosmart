@@ -22,6 +22,11 @@
 	<string>????</string>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>https</string>
+		<string>http</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
@@ -44,9 +49,16 @@
   <string>This app needs location access to show your current position on the map and set device locations.</string>
   <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
   <string>This app needs location access to show your current position on the map and set device locations.</string>
+  <key>NSLocationAlwaysUsageDescription</key>
+  <string>This app needs location access to show your current position on the map and set device locations.</string>
+  <key>NSLocationUsageDescription</key>
+  <string>This app needs location access to show your current position on the map and set device locations.</string>
   <!-- Camera usage description -->
   <key>NSCameraUsageDescription</key>
   <string>Camera access is required to scan QR codes for device setup.</string>
+  <!-- Local network usage description -->
+  <key>NSLocalNetworkUsageDescription</key>
+  <string>App needs to access your wifi information for device connection and update process.</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -58,5 +70,12 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+		<string>bluetooth-peripheral</string>
+	</array>
+	<key>UIViewControllerBasedStatusBarAppearance</key>
+	<false/>
 </dict>
 </plist>

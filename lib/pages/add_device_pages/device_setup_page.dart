@@ -158,9 +158,10 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
         }
       } else {
         String errorMsg = 'Device setup failed. ';
-        if (!result.identitySent) {
-          errorMsg += 'Identity settings could not be sent. ';
-        }
+        // Identity şimdilik kapalı, sadece config kontrolü
+        // if (!result.identitySent) {
+        //   errorMsg += 'Identity settings could not be sent. ';
+        // }
         if (!result.configSent) {
           errorMsg += 'Config deploy could not be sent.';
         }
@@ -222,7 +223,6 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
       }
     }
   }
-
 
   @override
   Widget build(BuildContext context) {

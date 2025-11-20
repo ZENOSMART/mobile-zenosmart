@@ -320,19 +320,19 @@ class BluetoothService {
         await Future.delayed(const Duration(milliseconds: 500));
         configSent = true;
 
-        // Identity settings gönder
-        onStepUpdate?.call('Identity');
-        debugPrint('📤 Identity settings gönderiliyor, uzunluk: ${identityData.length}');
-
-        if (targetChar.properties.writeWithoutResponse) {
-          await targetChar.write(identityData, withoutResponse: true);
-        } else {
-          await targetChar.write(identityData, withoutResponse: false);
-        }
-
-        debugPrint('✓ Identity settings verisi gönderildi');
-        await Future.delayed(const Duration(milliseconds: 500));
-        identitySent = true;
+        // Identity settings gönder - ŞİMDİLİK KAPALI
+        // onStepUpdate?.call('Identity');
+        // debugPrint('📤 Identity settings gönderiliyor, uzunluk: ${identityData.length}');
+        //
+        // if (targetChar.properties.writeWithoutResponse) {
+        //   await targetChar.write(identityData, withoutResponse: true);
+        // } else {
+        //   await targetChar.write(identityData, withoutResponse: false);
+        // }
+        //
+        // debugPrint('✓ Identity settings verisi gönderildi');
+        // await Future.delayed(const Duration(milliseconds: 500));
+        // identitySent = true;
       } else {
         debugPrint('❌ RX karakteristik bulunamadı');
       }

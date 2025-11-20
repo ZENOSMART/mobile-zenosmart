@@ -509,11 +509,15 @@ class DeviceSetupService {
       );
 
       debugPrint('✅ Cihaz detayları başarıyla kaydedildi');
-      debugPrint('✅ Identity settings gönderildi: ${result.identitySent}');
+      debugPrint(
+        '✅ Identity settings gönderildi: ${result.identitySent} (şimdilik kapalı)',
+      );
       debugPrint('✅ Config deploy gönderildi: ${result.configSent}');
 
+      // Identity şimdilik kapalı olduğu için sadece config kontrolü yapıyoruz
       return DeviceSetupCompleteResult(
-        success: result.identitySent && result.configSent,
+        success: result
+            .configSent, // Identity şimdilik kapalı, sadece config kontrolü
         identitySent: result.identitySent,
         configSent: result.configSent,
       );

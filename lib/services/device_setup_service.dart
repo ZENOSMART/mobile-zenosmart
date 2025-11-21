@@ -43,7 +43,7 @@ class DeviceSetupService {
             channelId,
           );
           // Eğer kanal şablonları yoksa, yeniden almayı deneyelim
-          if (channels == null || channels.isEmpty) {
+          if (channels.isEmpty) {
             await _fetchAndSaveChannelTemplatesForModel(channelId, orderCode);
           }
         }
@@ -60,9 +60,7 @@ class DeviceSetupService {
 
         // API'den gelen yanıtı kontrol et
         if (!typeModelResponse.success) {
-          throw Exception(
-            'API hatası: ${typeModelResponse.message ?? 'Bilinmeyen hata'}',
-          );
+          throw Exception('API hatası: ${typeModelResponse.message}');
         }
 
         if (typeModelResponse.data == null ||
@@ -156,7 +154,7 @@ class DeviceSetupService {
       if (!channelResponse.success) {
         // Kanal şablonlarının alınamaması kritik bir hata
         throw Exception(
-          'Kanal şablonları alınamadı: ${channelResponse.message ?? 'Bilinmeyen hata'}',
+          'Kanal şablonları alınamadı: ${channelResponse.message}',
         );
       }
 
@@ -407,7 +405,7 @@ class DeviceSetupService {
     }
   }
 
-  /// Tek bağlantıda cihaz kurulumunu yapar (UUID alma, identity ve config gönderme)
+  /// OrderCode'a göre model ve channel templates'leri çekip cihazı veritabanına kaydeder (UUID'leri Bluetooth ile alır)
   Future<DeviceSetupCompleteResult> setupDeviceComplete({
     required String uniqueKey,
     required String name,
@@ -423,13 +421,40 @@ class DeviceSetupService {
     Function(String step)? onStepUpdate,
   }) async {
     try {
-      // Önce orderCode kontrolü yapılır
+      // OrderCode kontrolü yapılır ve model/channel templates çekilir
       onStepUpdate?.call('Order Code Kontrolü');
       final deviceTypeModelId = await ensureDeviceTypeModel(orderCode);
 
       final deviceTypeName =
           DeviceType.displayNameBySerial(deviceType) ?? deviceType;
 
+      // Bluetooth ile UUID'leri al
+      onStepUpdate?.call('Bluetooth Connection');
+      debugPrint('🔍 Cihaz UUID\'lerini alıyor...');
+      final uuids = await _bluetoothService.setDeviceNameAndGetUuids(
+        deviceId: uniqueKey,
+        deviceName: name,
+        renameDevice: renameDevice,
+      );
+
+      // UUID'lerin başarıyla alınıp alınmadığını kontrol et
+      if (uuids.uartServiceUuid != null ||
+          uuids.rxCharUuid != null ||
+          uuids.txCharUuid != null) {
+        debugPrint('📝 UUID\'ler veritabanına kaydediliyor...');
+        debugPrint(
+          '  UART Service: ${uuids.uartServiceUuid ?? "null (korunacak)"}',
+        );
+        debugPrint('  RX Char: ${uuids.rxCharUuid ?? "null (korunacak)"}');
+        debugPrint('  TX Char: ${uuids.txCharUuid ?? "null (korunacak)"}');
+      } else {
+        debugPrint(
+          '⚠️ Uyarı: Hiçbir UUID bulunamadı, mevcut UUID\'ler korunacak',
+        );
+      }
+
+      // Cihazı veritabanına kaydet
+      onStepUpdate?.call('Cihaz Kaydediliyor');
       final deviceId = await _deviceRepo.upsert(
         uniqueData: uniqueKey,
         name: name.isEmpty ? null : name,
@@ -439,87 +464,21 @@ class DeviceSetupService {
         orderCode: orderCode,
       );
 
-      // DeviceAddr'ı parse et (4 byte olmalı)
-      List<int>? deviceAddrBytes;
-      if (deviceAddr != null && deviceAddr.isNotEmpty) {
-        deviceAddrBytes = _hexStringToBytes(deviceAddr);
-        if (deviceAddrBytes == null || deviceAddrBytes.length != 4) {
-          debugPrint('❌ DeviceAddr geçersiz: $deviceAddr');
-          throw Exception('DeviceAddr geçersiz: $deviceAddr');
-        }
-      }
-
-      // Identity settings paketini oluştur
-      final identityData = DeviceSettingsHelper.createDeviceCredentials(
-        devEui: devEui,
-        joinEui: joinEui,
-        deviceAddr: deviceAddrBytes,
-        counter: 1,
-        groupId: 3,
-      );
-
-      debugPrint('📤 Identity settings paketi oluşturuldu');
-      debugPrint('📤 DevEUI: $devEui, JoinEUI: $joinEui');
-      debugPrint('📤 Packet length: ${identityData.length} bytes');
-
-      // Config settings paketini oluştur
-      final configData = DeviceSettingsHelper.createDeviceConfigSettings(
-        latitude: latitude,
-        longitude: longitude,
-        counter: 1,
-      );
-
-      debugPrint('📤 Config settings paketi oluşturuldu');
-      debugPrint('📤 Latitude: $latitude, Longitude: $longitude');
-      debugPrint('📤 Packet length: ${configData.length} bytes');
-
-      // Tek bağlantıda tüm işlemleri yap
-      // Önce config deploy gönderilecek, sonra identity
-      final result = await _bluetoothService.setupDeviceComplete(
-        deviceId: uniqueKey,
-        deviceName: name,
-        identityData: identityData,
-        configData: configData,
-        renameDevice: renameDevice,
-        onStepUpdate: onStepUpdate,
-      );
-
-      // UUID'lerin başarıyla alınıp alınmadığını kontrol et
-      if (result.uartServiceUuid != null ||
-          result.rxCharUuid != null ||
-          result.txCharUuid != null) {
-        debugPrint('📝 UUID\'ler veritabanına kaydediliyor...');
-        debugPrint(
-          '  UART Service: ${result.uartServiceUuid ?? "null (korunacak)"}',
-        );
-        debugPrint('  RX Char: ${result.rxCharUuid ?? "null (korunacak)"}');
-        debugPrint('  TX Char: ${result.txCharUuid ?? "null (korunacak)"}');
-      } else {
-        debugPrint(
-          '⚠️ Uyarı: Hiçbir UUID bulunamadı, mevcut UUID\'ler korunacak',
-        );
-      }
-
-      // Cihaz detaylarını veritabanına kaydet
+      // Cihaz detaylarını veritabanına kaydet (UUID'ler Bluetooth ile alındı)
       await _detailRepo.upsert(
         deviceId: deviceId,
-        uartServiceUuid: result.uartServiceUuid,
-        rxCharUuid: result.rxCharUuid,
-        txCharUuid: result.txCharUuid,
+        uartServiceUuid: uuids.uartServiceUuid,
+        rxCharUuid: uuids.rxCharUuid,
+        txCharUuid: uuids.txCharUuid,
       );
 
-      debugPrint('✅ Cihaz detayları başarıyla kaydedildi');
-      debugPrint(
-        '✅ Identity settings gönderildi: ${result.identitySent} (şimdilik kapalı)',
-      );
-      debugPrint('✅ Config deploy gönderildi: ${result.configSent}');
+      debugPrint('✅ Cihaz başarıyla kaydedildi');
+      debugPrint('✅ OrderCode: $orderCode');
+      debugPrint('✅ Device Type Model ID: $deviceTypeModelId');
 
-      // Identity şimdilik kapalı olduğu için sadece config kontrolü yapıyoruz
       return DeviceSetupCompleteResult(
-        success: result
-            .configSent, // Identity şimdilik kapalı, sadece config kontrolü
-        identitySent: result.identitySent,
-        configSent: result.configSent,
+        success: true,
+        configSent: false, // Config gönderilmedi
       );
     } catch (e) {
       debugPrint('❌ Device setup complete hatası: $e');
@@ -538,12 +497,7 @@ class DeviceSetupService {
 
 class DeviceSetupCompleteResult {
   final bool success;
-  final bool identitySent;
   final bool configSent;
 
-  DeviceSetupCompleteResult({
-    required this.success,
-    required this.identitySent,
-    required this.configSent,
-  });
+  DeviceSetupCompleteResult({required this.success, required this.configSent});
 }

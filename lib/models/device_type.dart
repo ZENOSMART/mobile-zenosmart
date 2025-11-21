@@ -6,24 +6,28 @@ enum DeviceType {
     displayName: 'Zenopix Custom Box v1.0',
     icon: Icons.lightbulb_outline,
     imageAssetPath: 'assets/devices/special_box.png',
+    orderCode: 'LCCB1L011ABAXR00',
   ),
   zenopixWateringModule(
     serialId: '6E400001-B5A3-F393-E0A9-E50E24DCCA9E',
     displayName: 'Zenopix Watering Module v1.0',
     icon: Icons.water_drop,
     imageAssetPath: 'assets/devices/watering_module.png',
+    orderCode: null,
   );
 
   final String serialId;
   final String displayName;
   final IconData icon;
   final String imageAssetPath;
+  final String? orderCode;
 
   const DeviceType({
     required this.serialId,
     required this.displayName,
     required this.icon,
     required this.imageAssetPath,
+    this.orderCode,
   });
 
   // Tüm seri numaralarını liste olarak döndür
@@ -53,6 +57,28 @@ enum DeviceType {
     if (targetUuid == null || targetUuid.isEmpty) return false;
     final target = targetUuid.toUpperCase();
     return advertisedServiceUuids.any((s) => s.toUpperCase() == target);
+  }
+
+  // OrderCode'a göre device type bul
+  static DeviceType? findByOrderCode(String? orderCode) {
+    if (orderCode == null || orderCode.isEmpty) return null;
+    try {
+      return DeviceType.values.firstWhere(
+        (e) =>
+            e.orderCode != null &&
+            e.orderCode!.toUpperCase() == orderCode.toUpperCase(),
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Tüm orderCode'ları liste olarak döndür
+  static List<String> getAllOrderCodes() {
+    return DeviceType.values
+        .where((e) => e.orderCode != null)
+        .map((e) => e.orderCode!)
+        .toList();
   }
 }
 

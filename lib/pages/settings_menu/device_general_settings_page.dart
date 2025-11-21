@@ -40,6 +40,7 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
   // Text controllers for editable fields
   final _minPackTimeController = TextEditingController();
   final _bleUartWakeupController = TextEditingController();
+  final _uplinkIntervalController = TextEditingController();
 
   // Form key for validation
   final _formKey = GlobalKey<FormState>();
@@ -50,7 +51,6 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
   bool _isConfirmedResendManual = false;
 
   // Read-only values (cihazdan alınan, değiştirilemez - gönderirken kullanılacak)
-  int? _uplinkInterval;
   int? _activationType;
   int? _dataRate;
 
@@ -75,6 +75,7 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
     _timeoutTimer?.cancel();
     _minPackTimeController.dispose();
     _bleUartWakeupController.dispose();
+    _uplinkIntervalController.dispose();
     super.dispose();
   }
 
@@ -193,8 +194,12 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
                   _isConfirmed = result.general!.isConfirmed;
                   _isConfirmedResendManual =
                       result.general!.isConfirmedResendManual == 1;
+                  // Uplink interval'i dakika olarak göster (cihazdan zaten dakika olarak geliyor)
+                  _uplinkIntervalController.text = result
+                      .general!
+                      .uplinkInterval
+                      .toString();
                   // Read-only değerleri kaydet (gönderirken kullanılacak)
-                  _uplinkInterval = result.general!.uplinkInterval;
                   _activationType = result.general!.activationType ?? 0;
                   _dataRate = result.general!.dataRate ?? 0;
                 });
@@ -245,10 +250,11 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
       final minPackTimeSeconds = int.tryParse(_minPackTimeController.text) ?? 0;
       final bleUartWakeupSeconds =
           int.tryParse(_bleUartWakeupController.text) ?? 0;
+      // Uplink interval zaten dakika olarak (cihaz dakika bekliyor)
+      final uplinkInterval = int.tryParse(_uplinkIntervalController.text) ?? 1;
       final isConfirmedResendManual = _isConfirmedResendManual ? 1 : 0;
 
       // Read-only değerleri cihazdan alınan değerlerle kullan (eğer yoksa default)
-      final uplinkInterval = _uplinkInterval ?? 1;
       final activationType = _activationType ?? 0;
       final dataRate = _dataRate ?? 0;
 
@@ -379,6 +385,12 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
                       hint: '0-65535',
                     ),
                     const SizedBox(height: 12),
+                    _buildTextField(
+                      label: 'Uplink Interval (Minutes)',
+                      controller: _uplinkIntervalController,
+                      hint: 'Enter minutes',
+                    ),
+                    const SizedBox(height: 12),
                     _buildSwitchField(
                       label: 'Is Confirmed',
                       value: _isConfirmed,
@@ -460,8 +472,20 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
               if (number == null) {
                 return 'Please enter a valid number';
               }
-              if (number < 0 || number > 65535) {
-                return 'Please enter a value between 0-65535';
+              // Uplink interval için özel validasyon (dakika cinsinden)
+              if (label.contains('Uplink Interval')) {
+                if (number < 0) {
+                  return 'Please enter a positive number';
+                }
+                // Maksimum değer: 65535 dakika (uint16 maksimum değeri)
+                if (number > 65535) {
+                  return 'Please enter a value between 0-65535 minutes';
+                }
+              } else {
+                // Diğer alanlar için standart validasyon
+                if (number < 0 || number > 65535) {
+                  return 'Please enter a value between 0-65535';
+                }
               }
               return null;
             },

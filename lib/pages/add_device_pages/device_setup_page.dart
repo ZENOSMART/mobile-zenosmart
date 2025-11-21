@@ -24,8 +24,6 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
   String _errorMessage = '';
   bool _isCompleted = false;
   bool _processStarted = false;
-  bool _configDeploySent = false;
-  int _configDeployAttempt = 0; // Add this to track config deploy attempts
   String _currentStep = ''; // Current step message
 
   @override
@@ -42,11 +40,11 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
     if (_currentStep.contains('Order Code')) {
       return 'Checking Order Code';
     }
-    if (_currentStep.contains('Config')) {
-      return 'Sending Config Deploy';
+    if (_currentStep.contains('Bluetooth')) {
+      return 'Connecting to Device';
     }
-    if (_currentStep.contains('Identity')) {
-      return 'Sending Identity Settings';
+    if (_currentStep.contains('Cihaz Kaydediliyor')) {
+      return 'Saving Device';
     }
     return 'Processing...';
   }
@@ -64,7 +62,6 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
       _isChecking = true;
       _errorMessage = '';
       _isCompleted = false;
-      _configDeploySent = false;
       _currentStep = 'Order Code Kontrolü';
     });
 
@@ -125,8 +122,8 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
         orderCode: widget.draft.orderCode,
         devEui: widget.draft.devEui,
         joinEui: widget.draft.joinEui,
-        latitude: widget.draft.latitude!,
-        longitude: widget.draft.longitude!,
+        latitude: widget.draft.latitude ?? 0.0,
+        longitude: widget.draft.longitude ?? 0.0,
         location: widget.draft.location,
         deviceType: widget.draft.deviceType,
         deviceAddr: widget.draft.deviceAddr,
@@ -135,12 +132,6 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
           if (mounted) {
             setState(() {
               _currentStep = step;
-              // Step güncellemelerini UI'ye yansıt
-              if (step.contains('Identity') || step == 'Identity') {
-                _configDeploySent = true;
-              } else if (step.contains('Config') || step == 'Config Deploy') {
-                _configDeploySent = false;
-              }
             });
           }
         },
@@ -152,27 +143,16 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
           setState(() {
             _isChecking = false;
             _isCompleted = true;
-            _configDeploySent = true;
-            _configDeployAttempt = 0;
           });
         }
       } else {
-        String errorMsg = 'Device setup failed. ';
-        // Identity şimdilik kapalı, sadece config kontrolü
-        // if (!result.identitySent) {
-        //   errorMsg += 'Identity settings could not be sent. ';
-        // }
-        if (!result.configSent) {
-          errorMsg += 'Config deploy could not be sent.';
-        }
+        String errorMsg = 'Device setup failed.';
         if (mounted) {
           setState(() {
             _errorMessage = errorMsg;
             _isChecking = false;
             _isCompleted = false;
             _processStarted = false;
-            _configDeploySent = false;
-            _configDeployAttempt = 0;
           });
         }
       }
@@ -255,7 +235,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Press the "Save" button to load device configurations',
+                    'Press the "Save" button to save device and load configurations',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
@@ -349,7 +329,7 @@ class _DeviceSetupPageState extends State<DeviceSetupPage> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Device has been successfully configured',
+                    'Device has been successfully saved',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),

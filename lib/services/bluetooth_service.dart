@@ -225,11 +225,10 @@ class BluetoothService {
     }
   }
 
-  /// Tek bağlantıda UUID'leri alır, identity settings ve config deploy gönderir
+  /// Tek bağlantıda UUID'leri alır ve config deploy gönderir (identity kaldırıldı)
   Future<DeviceSetupResult> setupDeviceComplete({
     required String deviceId,
     required String deviceName,
-    required List<int> identityData,
     required List<int> configData,
     bool renameDevice = true,
     Function(String step)? onStepUpdate,
@@ -237,7 +236,6 @@ class BluetoothService {
     String? foundUartServiceUuid;
     String? foundRxCharUuid;
     String? foundTxCharUuid;
-    bool identitySent = false;
     bool configSent = false;
 
     BluetoothDevice? device;
@@ -304,9 +302,8 @@ class BluetoothService {
         debugPrint('✓ Tüm UUID\'ler başarıyla bulundu');
       }
 
-      // Önce config deploy gönder, sonra identity settings gönder
+      // Config deploy gönder
       if (targetChar != null) {
-        // Config deploy gönder
         onStepUpdate?.call('Config Deploy');
         debugPrint('📤 Config deploy gönderiliyor, uzunluk: ${configData.length}');
 
@@ -319,20 +316,6 @@ class BluetoothService {
         debugPrint('✓ Config deploy verisi gönderildi');
         await Future.delayed(const Duration(milliseconds: 500));
         configSent = true;
-
-        // Identity settings gönder - ŞİMDİLİK KAPALI
-        // onStepUpdate?.call('Identity');
-        // debugPrint('📤 Identity settings gönderiliyor, uzunluk: ${identityData.length}');
-        //
-        // if (targetChar.properties.writeWithoutResponse) {
-        //   await targetChar.write(identityData, withoutResponse: true);
-        // } else {
-        //   await targetChar.write(identityData, withoutResponse: false);
-        // }
-        //
-        // debugPrint('✓ Identity settings verisi gönderildi');
-        // await Future.delayed(const Duration(milliseconds: 500));
-        // identitySent = true;
       } else {
         debugPrint('❌ RX karakteristik bulunamadı');
       }
@@ -345,7 +328,6 @@ class BluetoothService {
         uartServiceUuid: foundUartServiceUuid,
         rxCharUuid: foundRxCharUuid,
         txCharUuid: foundTxCharUuid,
-        identitySent: identitySent,
         configSent: configSent,
       );
     } catch (e) {
@@ -361,7 +343,6 @@ class BluetoothService {
         uartServiceUuid: foundUartServiceUuid,
         rxCharUuid: foundRxCharUuid,
         txCharUuid: foundTxCharUuid,
-        identitySent: identitySent,
         configSent: configSent,
       );
     }
@@ -392,14 +373,12 @@ class DeviceSetupResult {
   final String? uartServiceUuid;
   final String? rxCharUuid;
   final String? txCharUuid;
-  final bool identitySent;
   final bool configSent;
 
   DeviceSetupResult({
     this.uartServiceUuid,
     this.rxCharUuid,
     this.txCharUuid,
-    required this.identitySent,
     required this.configSent,
   });
 }

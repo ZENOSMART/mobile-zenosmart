@@ -48,11 +48,12 @@
 	<!-- Bluetooth usage descriptions -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>This app needs Bluetooth access to scan and connect to Zenosmart devices.</string>
-
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app needs Bluetooth access to scan and connect to Zenosmart devices.</string>
 
-	<!-- Location usage description (ONLY When In Use) -->
+	<!-- Location usage descriptions -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs location access to track and manage your Zenosmart devices even when the app is in the background.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs location access to show your current position on the map and set device locations.</string>
 
@@ -62,7 +63,7 @@
 
 	<!-- Local network usage description -->
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>App needs to access your wifi information for device connection and update process.</string>
+	<string>App needs to access your Wi-Fi information for device connection and update process.</string>
 
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
@@ -77,7 +78,6 @@
 
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>This app does NOT access your photos. Required due to camera framework.</string>
-
 
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>

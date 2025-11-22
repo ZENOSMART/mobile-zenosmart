@@ -432,7 +432,7 @@ class _DeviceIdentitySettingsPageState
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: _scanQr,
+                        onPressed: null,
                         icon: const Icon(Icons.qr_code_scanner, size: 22),
                         label: const Text('Scan QR Code'),
                       ),
@@ -442,9 +442,7 @@ class _DeviceIdentitySettingsPageState
                       width: double.infinity,
                       height: _fieldHeight,
                       child: ElevatedButton.icon(
-                        onPressed: _isSending
-                            ? null
-                            : _sendIdentitySettingsToDevice,
+                        onPressed: null,
                         icon: _isSending
                             ? const SizedBox(
                                 width: 20,
@@ -490,6 +488,7 @@ class _DeviceIdentitySettingsPageState
           height: _fieldHeight,
           child: TextFormField(
             controller: controller,
+            readOnly: true,
             decoration: _buildInputDecoration(hintText: hint),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {

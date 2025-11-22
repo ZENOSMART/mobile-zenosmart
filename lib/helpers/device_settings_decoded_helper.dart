@@ -90,7 +90,17 @@ class DeviceSettingsDecodedHelper {
 
     final devEuiBytes = payloadBytes.sublist(0, 8);
     final joinEuiBytes = payloadBytes.sublist(8, 16);
-    final deviceAddrBytes = payloadBytes.sublist(16, 20);
+
+    // deviceAddr'i little endian olarak oku
+    final byteData = ByteData.sublistView(Uint8List.fromList(payloadBytes));
+    final deviceAddrValue = byteData.getUint32(16, Endian.little);
+    // Hex formatında göstermek için big endian byte sırasına çevir
+    final deviceAddrBytes = [
+      (deviceAddrValue >> 24) & 0xFF,
+      (deviceAddrValue >> 16) & 0xFF,
+      (deviceAddrValue >> 8) & 0xFF,
+      deviceAddrValue & 0xFF,
+    ];
 
     final identity = DeviceSettingsIdentity(
       devEui: _bytesToHex(devEuiBytes),

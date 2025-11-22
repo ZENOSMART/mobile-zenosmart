@@ -75,6 +75,10 @@
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>This app does NOT access your photos. Required due to camera framework.</string>
+
+
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
 

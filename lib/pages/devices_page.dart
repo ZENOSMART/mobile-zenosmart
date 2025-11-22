@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../repositories/device_repository.dart';
 import 'device_detail_page.dart';
 import 'device_type_page.dart';
+import 'welcome_page.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
 import '../repositories/device_detail_repository.dart';
@@ -118,9 +119,25 @@ class _DevicesPageState extends State<DevicesPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF1F1F1),
-      appBar: AppBar(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const WelcomePage()),
+        );
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF1F1F1),
+        appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (_) => const WelcomePage()),
+            );
+          },
+        ),
         title: Image.asset(
           'assets/images/zenosmart-logo.png',
           height: 22,
@@ -322,6 +339,7 @@ class _DevicesPageState extends State<DevicesPage> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

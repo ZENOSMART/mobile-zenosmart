@@ -52,13 +52,16 @@
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>This app needs Bluetooth access to scan and connect to Zenosmart devices.</string>
 
-	<!-- Location usage description (ONLY When In Use) -->
+	<!-- Location usage descriptions -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>This app needs location access to show your current position on the map and set device locations.</string>
 
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs location access to scan for Bluetooth devices and connect to Zenosmart devices.</string>
+
 	<!-- Camera usage description -->
 	<key>NSCameraUsageDescription</key>
-	<string>Camera access is required to scan QR codes for device setup.</string>
+	<string>This app needs camera access to scan QR codes for device setup and configuration.</string>
 
 	<!-- Local network usage description -->
 	<key>NSLocalNetworkUsageDescription</key>

@@ -151,6 +151,14 @@ class DeviceSettingsHelper {
     return packet;
   }
 
+  static List<int> createDeviceJoinRequest({int counter = 1}) {
+    final header = DataHelper.prepareHeaderData('NM', 0, counter);
+    final packet = <int>[...header];
+    final crc = DataHelper.calculateCRC(packet);
+    packet.addAll(_intToBytes(crc));
+    return packet;
+  }
+
   static List<int> createDeviceClear({int counter = 1}) {
     final header = DataHelper.prepareHeaderData('CA', 0, counter);
     final packet = <int>[...header];

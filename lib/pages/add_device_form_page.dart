@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'add_device_pages/device_info_page.dart';
+import 'devices_page.dart';
 
 class AddDeviceDraft {
   AddDeviceDraft({required this.uniqueKey});
@@ -74,9 +75,15 @@ class _AddDeviceFormPageState extends State<AddDeviceFormPage> {
               child: DeviceInfoPage(
                 draft: _draft,
                 onDraftUpdated: _updateDraft,
-                onSetupComplete: () {
-                  // Setup completed, close the form
-                  if (mounted) Navigator.of(context).pop(true);
+                onSetupComplete: () async {
+                  // Setup completed, navigate back to Devices Page
+                  if (mounted) {
+                    // Tüm ekleme sayfalarını kapat ve Devices Page'e dön
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(builder: (_) => const DevicesPage()),
+                    );
+                  }
                 },
               ),
             ),

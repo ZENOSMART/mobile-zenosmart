@@ -27,6 +27,7 @@ class DeviceCardSettingsPage extends StatefulWidget {
 class _DeviceCardSettingsPageState extends State<DeviceCardSettingsPage> {
   bool _isResetting = false;
   bool _isClearing = false;
+  bool _isJoining = false;
 
   Future<void> _handleDeviceReset() async {
     final confirmed = await showDialog<bool>(
@@ -86,6 +87,69 @@ class _DeviceCardSettingsPageState extends State<DeviceCardSettingsPage> {
       if (mounted) {
         setState(() {
           _isResetting = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleDeviceJoinRequest() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Join Request'),
+        content: const Text(
+          'The device will rejoin the LoRaWAN network. Are you sure?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF008E46),
+            ),
+            child: const Text('Join'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isJoining = true;
+    });
+
+    try {
+      final packet = DeviceSettingsHelper.createDeviceJoinRequest();
+      await widget.rxCharacteristic.write(
+        packet,
+        withoutResponse: widget.writeWithoutResponse,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Join request command sent successfully'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sending join request command: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isJoining = false;
         });
       }
     }
@@ -159,10 +223,7 @@ class _DeviceCardSettingsPageState extends State<DeviceCardSettingsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F1F1),
-      appBar: AppBar(
-        title: const Text('Device Reset/Clear'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Device Operations'), centerTitle: true),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -200,10 +261,7 @@ class _DeviceCardSettingsPageState extends State<DeviceCardSettingsPage> {
                   const SizedBox(height: 12),
                   const Text(
                     'Restarts the device. All settings will be preserved.',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -228,7 +286,75 @@ class _DeviceCardSettingsPageState extends State<DeviceCardSettingsPage> {
                               ),
                             )
                           : const Icon(Icons.refresh, size: 20),
-                      label: Text(_isResetting ? 'Resetting...' : 'Reset Device'),
+                      label: Text(
+                        _isResetting ? 'Resetting...' : 'Reset Device',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Join Request Card
+          Card(
+            margin: const EdgeInsets.only(bottom: 16),
+            color: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.wifi,
+                        size: 32,
+                        color: const Color(0xFF008E46),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Join Request',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'The device will rejoin the LoRaWAN network.',
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _isJoining ? null : _handleDeviceJoinRequest,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF008E46),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: _isJoining
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.wifi, size: 20),
+                      label: Text(_isJoining ? 'Joining...' : 'Join Network'),
                     ),
                   ),
                 ],
@@ -269,10 +395,7 @@ class _DeviceCardSettingsPageState extends State<DeviceCardSettingsPage> {
                   const SizedBox(height: 12),
                   const Text(
                     'Resets all information stored in the device. This operation cannot be undone!',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                   const SizedBox(height: 16),
                   SizedBox(
@@ -309,4 +432,3 @@ class _DeviceCardSettingsPageState extends State<DeviceCardSettingsPage> {
     );
   }
 }
-

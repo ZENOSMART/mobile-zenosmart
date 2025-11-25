@@ -38,6 +38,7 @@ class _DeviceIdentitySettingsPageState
   String? _errorMessage;
   bool _isRequested = false;
   Timer? _timeoutTimer;
+  bool _isReadOnly = true; // true: readonly, false: editable
 
   // Text controllers for editable fields
   final _devEuiController = TextEditingController();
@@ -432,7 +433,7 @@ class _DeviceIdentitySettingsPageState
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: null,
+                        onPressed: _isReadOnly ? null : _scanQr,
                         icon: const Icon(Icons.qr_code_scanner, size: 22),
                         label: const Text('Scan QR Code'),
                       ),
@@ -442,7 +443,9 @@ class _DeviceIdentitySettingsPageState
                       width: double.infinity,
                       height: _fieldHeight,
                       child: ElevatedButton.icon(
-                        onPressed: null,
+                        onPressed: (_isReadOnly || _isSending)
+                            ? null
+                            : _sendIdentitySettingsToDevice,
                         icon: _isSending
                             ? const SizedBox(
                                 width: 20,
@@ -488,7 +491,7 @@ class _DeviceIdentitySettingsPageState
           height: _fieldHeight,
           child: TextFormField(
             controller: controller,
-            readOnly: true,
+            readOnly: _isReadOnly,
             decoration: _buildInputDecoration(hintText: hint),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {

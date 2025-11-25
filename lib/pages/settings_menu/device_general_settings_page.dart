@@ -36,6 +36,7 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
   String? _errorMessage;
   bool _isRequested = false;
   Timer? _timeoutTimer;
+  bool _isReadOnly = true; // true: readonly, false: editable
 
   // Text controllers for editable fields
   final _minPackTimeController = TextEditingController();
@@ -415,7 +416,9 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
                       width: double.infinity,
                       height: _fieldHeight,
                       child: ElevatedButton.icon(
-                        onPressed: null,
+                        onPressed: (_isReadOnly || _isSending)
+                            ? null
+                            : _sendGeneralSettingsToDevice,
                         icon: _isSending
                             ? const SizedBox(
                                 width: 20,
@@ -461,7 +464,7 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
             controller: controller,
             keyboardType: TextInputType.number,
             inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-            readOnly: true,
+            readOnly: _isReadOnly,
             decoration: _buildInputDecoration(hintText: hint),
             validator: (value) {
               if (value == null || value.isEmpty) {
@@ -531,7 +534,7 @@ class _DeviceGeneralSettingsPageState extends State<DeviceGeneralSettingsPage> {
                 trackOutlineColor: MaterialStateProperty.resolveWith(
                   (states) => Colors.transparent,
                 ),
-                onChanged: null,
+                onChanged: _isReadOnly ? null : onChanged,
               ),
               const SizedBox(width: 8),
             ],

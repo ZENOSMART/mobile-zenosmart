@@ -5,6 +5,8 @@ import 'device_general_settings_page.dart';
 import 'device_identity_settings_page.dart';
 import 'device_firmware_info_settings_page.dart';
 import 'device_card_settings_page.dart';
+import 'device_name_page.dart';
+import '../../repositories/device_repository.dart';
 import '../firmware_update_page.dart';
 
 class DeviceSettingsMenuPage extends StatelessWidget {
@@ -33,6 +35,47 @@ class DeviceSettingsMenuPage extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _buildSettingsItem(
+            context: context,
+            icon: Icons.edit,
+            title: 'Device Name',
+            onTap: () async {
+              final result = await showDialog<bool>(
+                context: context,
+                builder: (dialogContext) => DeviceNamePage(
+                  device: device,
+                  rxCharacteristic: rxCharacteristic,
+                  txCharacteristic: txCharacteristic,
+                  writeWithoutResponse: writeWithoutResponse,
+                  deviceDbId: deviceDbId,
+                  deviceName: deviceName,
+                  deviceUniqueId: device.remoteId.str,
+                ),
+              );
+              // İsim güncellendiyse sayfayı yenile (AppBar başlığını güncellemek için)
+              if (result == true && context.mounted) {
+                // Veritabanından yeni ismi al
+                final deviceRepo = const DeviceRepository();
+                final deviceData = await deviceRepo.getById(deviceDbId);
+                if (deviceData != null && context.mounted) {
+                  final newName = (deviceData['name'] as String?) ?? deviceName;
+                  // Sayfayı yeni isimle yeniden oluştur
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => DeviceSettingsMenuPage(
+                        device: device,
+                        rxCharacteristic: rxCharacteristic,
+                        txCharacteristic: txCharacteristic,
+                        writeWithoutResponse: writeWithoutResponse,
+                        deviceDbId: deviceDbId,
+                        deviceName: newName,
+                      ),
+                    ),
+                  );
+                }
+              }
+            },
+          ),
           _buildSettingsItem(
             context: context,
             icon: Icons.map,
@@ -131,7 +174,7 @@ class DeviceSettingsMenuPage extends StatelessWidget {
           _buildSettingsItem(
             context: context,
             icon: Icons.settings_applications,
-            title: 'Device Reset/Clear',
+            title: 'Device Reset/Clear/Join',
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute(

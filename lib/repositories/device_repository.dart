@@ -80,20 +80,20 @@ class DeviceRepository {
 
   Future<List<Map<String, Object?>>> listAll() async {
     final db = await AppDatabase.instance.database;
-    return db.query('devices', orderBy: 'id DESC');
+    return db.query('devices', orderBy: 'rowid DESC');
   }
 
   Future<List<Map<String, Object?>>> searchByName(String query) async {
     final db = await AppDatabase.instance.database;
     final q = query.trim();
     if (q.isEmpty) {
-      return db.query('devices', orderBy: 'id DESC');
+      return db.query('devices', orderBy: 'rowid DESC');
     }
     return db.query(
       'devices',
       where: 'name LIKE ?',
       whereArgs: ['%$q%'],
-      orderBy: 'id DESC',
+      orderBy: 'rowid DESC',
     );
   }
 
@@ -121,5 +121,15 @@ class DeviceRepository {
   Future<int> deleteById(String id) async {
     final db = await AppDatabase.instance.database;
     return db.delete('devices', where: 'id = ?', whereArgs: [id]);
+  }
+
+  Future<int> updateName(String id, String name) async {
+    final db = await AppDatabase.instance.database;
+    return db.update(
+      'devices',
+      {'name': name},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 }

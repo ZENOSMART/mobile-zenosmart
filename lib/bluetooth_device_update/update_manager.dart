@@ -195,7 +195,7 @@ class UpdateManager {
   }
 
   /// Sunucudan firmware bilgisi al
-  /// FileState cihaza gönderilmez, sadece bilgi alınır
+  /// FileState otomatik olarak cihaza gönderilir
   Future<UpdateInfo?> fetchFirmwareInfo({
     required String project,
     required String hwVersion,
@@ -212,8 +212,21 @@ class UpdateManager {
       if (info != null) {
         _currentUpdateInfo = info;
         _chunkManager = ChunkManager(info.fileSize);
+        
+        // FileState'i otomatik olarak cihaza gönder
+        if (_rxCharacteristic != null) {
+          try {
+            debugPrint('[UpdateManager] Sending FileState to device...');
+            await _writeToDevice(info.rawEncryptedResponse);
+            debugPrint('[UpdateManager] ✅ FileState sent to device');
+          } catch (e) {
+            debugPrint('[UpdateManager] ⚠️ FileState gönderilemedi: $e');
+            // Hata olsa bile bilgiyi döndür, kullanıcı tekrar deneyebilir
+          }
+        }
+        
         _setState(UpdateState.ready);
-        debugPrint('[UpdateManager] ✅ Firmware info received (FileState will be sent when startUpdate is called)');
+        debugPrint('[UpdateManager] ✅ Firmware info received and FileState sent');
       } else {
         _setState(UpdateState.idle);
         _emitError('Sunucudan firmware bilgisi alınamadı');
@@ -224,32 +237,6 @@ class UpdateManager {
       _setState(UpdateState.failed);
       _emitError('Firmware bilgisi alma hatası: $e');
       return null;
-    }
-  }
-
-  /// Sunucu cevabını cihaza gönder (FileState)
-  Future<void> sendServerResponseToDevice() async {
-    if (_currentUpdateInfo == null) {
-      _emitError('Önce sunucudan firmware bilgisi alınmalı');
-      return;
-    }
-
-    if (_rxCharacteristic == null) {
-      _emitError('BLE karakteristiği ayarlanmamış');
-      return;
-    }
-
-    try {
-      debugPrint('[UpdateManager] Sending server response to device...');
-      await _writeToDevice(_currentUpdateInfo!.rawEncryptedResponse);
-      
-      // FileState gönderildikten SONRA updating durumuna geç
-      _setState(UpdateState.updating);
-      debugPrint('[UpdateManager] ✅ Server response sent, now waiting for chunks...');
-    } catch (e) {
-      _setState(UpdateState.failed);
-      _emitError('Sunucu cevabı gönderilemedi: $e');
-      rethrow;
     }
   }
 
@@ -276,8 +263,8 @@ class UpdateManager {
     }
   }
 
-  /// Güncellemeyi başlat (FileState + START_UPDATE komutu)
-  /// Önce FileState gönderilir, sonra START_UPDATE, sonra chunk modu açılır
+  /// Güncellemeyi başlat (START_UPDATE komutu)
+  /// FileState zaten fetchFirmwareInfo sırasında gönderilmiş olmalı
   Future<void> startUpdate() async {
     if (_currentUpdateInfo == null || !_currentUpdateInfo!.isUpdateAvailable) {
       _emitError('Güncelleme mevcut değil');
@@ -292,17 +279,12 @@ class UpdateManager {
     try {
       _setState(UpdateState.updating);
       
-      // Önce FileState'i cihaza gönder
-      debugPrint('[UpdateManager] Sending FileState to device...');
-      await _writeToDevice(_currentUpdateInfo!.rawEncryptedResponse);
-      debugPrint('[UpdateManager] ✅ FileState sent to device');
-      
       // Chunk gönderme modunu aç ve reset
       _shouldForwardChunks = true;
       _chunkManager?.reset();
       debugPrint('[UpdateManager] ✅ Chunk forwarding enabled, ChunkManager reset');
 
-      // Sonra START_UPDATE gönder
+      // START_UPDATE komutunu gönder
       debugPrint('[UpdateManager] Sending START_UPDATE...');
       const command = 'START_UPDATE';
       final encrypted = EncryptionHelper.encryptString(command);

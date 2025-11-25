@@ -255,7 +255,7 @@ class _FirmwareUpdatePageState extends State<FirmwareUpdatePage> {
     }
 
     // CİHAZDAN GELEN BİLGİLERLE sunucuya sor
-    // FileState,FileSize otomatik olarak cihaza gönderilecek
+    // FileState otomatik olarak cihaza gönderilecek
     final info = await _updateManager.fetchFirmwareInfo(
       project: _deviceVersionInfo!.project ?? widget.project,
       hwVersion: _deviceVersionInfo!.hwVersion ?? widget.hwVersion,

@@ -78,6 +78,15 @@ class AboutHelpPage extends StatelessWidget {
                           height: 1.5,
                         ),
                       ),
+                      SizedBox(height: 12),
+                      const Text(
+                        'Zenosmart is a registered trademark of ZENOPIX®',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                          height: 1.5,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -131,7 +140,7 @@ class AboutHelpPage extends StatelessWidget {
                       const Divider(),
                       // Email
                       InkWell(
-                        onTap: () => _launchEmail('info@zenosmart.com'),
+                        onTap: () => _launchEmail('info@zenopix.com'),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Row(
@@ -144,7 +153,7 @@ class AboutHelpPage extends StatelessWidget {
                               const SizedBox(width: 12),
                               const Expanded(
                                 child: Text(
-                                  'info@zenosmart.com',
+                                  'info@zenopix.com',
                                   style: TextStyle(
                                     fontSize: 16,
                                     color: Color(0xFF008E46),
@@ -163,7 +172,7 @@ class AboutHelpPage extends StatelessWidget {
               // Version
               Center(
                 child: Text(
-                  'Version 3.0.0+1',
+                  'Version 3.0.0+3',
                   style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                 ),
               ),

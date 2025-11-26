@@ -61,7 +61,7 @@
 
 	<!-- Camera usage description -->
 	<key>NSCameraUsageDescription</key>
-	<string>This app needs camera access to scan QR codes for device setup and configuration.</string>
+	<string>This app requires camera access to scan QR codes for device setup and configuration. The camera is used only when you choose to scan a QR code.</string>
 
 	<!-- Local network usage description -->
 	<key>NSLocalNetworkUsageDescription</key>
